@@ -1,5 +1,21 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
+
+## Reflections
+
+### Code Changes
+Main code changes take place in src/main.cpp only. Beside utilizing the provided helpers.h, I copied spline.h to be used, as the tips in the original README suggested.
+### Breakdown of Code Functionality
+* Lines 56-58: initialize vehicle in the middle lane (1) at rest (reference velocity rv = 0).
+* Lines 105-118: init status tracking variables (path and obstacles) and check / load status history.
+* Lines 120-167: check sensor fusion data, to detect current lane position, speed (use history when available), and surrounding cars (within 30 meters).
+* Lines 169-181: change speed and lane as necessary: if front car is within 30 meters ahead, slow down by about 7m/s^2 (0.3 mph in 0.03 seconds), and switch to left (check first) or right lane if no car is close on them; if no car at front, accelerate by about 7m/s^2 if current speed is less than 44mph; otherwise keep the speed and lane to avoid speeding.
+* Lines 183-211: start calculating path. First generate the initial few points either by going straight (no history) or use the last history point to project the path and yaw.
+* Lines 213-232: project the next 3 points at 30m apart in Frenet system, and project back to car local coordinates.
+* Lines 234-247: calculate the projected spline based on old path and break up target in 30m per point.
+* Lines 249-268: generate remainder of the 50 points after carrying previous path points using the calculated speed, position and yaw info, and convert to global coordinates before pushing to the projected path.
+   
+   
    
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).  
