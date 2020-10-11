@@ -168,7 +168,7 @@ int main() {
 
             // Adjust speed and lane.
             if (front_car) { // Slow down 
-              ref_vel -= 0.2; // Decrease 10 miles per hour.
+              rv -= 0.2; // Decrease 10 miles per hour - around 5 meters per s^2 deceleration.
               if (!left_car && lane > 0) {
                 --lane; // Switch left
               } else if (!right_car && lane != 2) {
