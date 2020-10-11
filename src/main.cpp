@@ -176,7 +176,7 @@ int main()
                             ++lane; // Switch right.
                         }
                     }
-                    else if (rv < 40) { // Upper bound is 50 mph - accelerate.
+                    else if (rv < 49) { // Upper bound is 50 mph - accelerate.
                         rv += 0.3;
                     }
 
