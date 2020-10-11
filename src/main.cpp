@@ -168,7 +168,7 @@ int main()
 
                     // Adjust speed and lane.
                     if (front_car) { // Slow down
-                        rv -= 0.2; // Decrease 10 miles per hour - around 5 meters per s^2 deceleration.
+                        rv -= 0.3; // Decrease 15 miles per hour - around 7 meters per s^2 deceleration.
                         if (!left_car && lane > 0) {
                             --lane; // Switch left
                         }
@@ -176,8 +176,8 @@ int main()
                             ++lane; // Switch right.
                         }
                     }
-                    else if (rv < 49.8) { // Upper bound is 50 mph - accelerate.
-                        rv += 0.2;
+                    else if (rv < 40) { // Upper bound is 50 mph - accelerate.
+                        rv += 0.3;
                     }
 
                     // Now define the path based on the updates above.
