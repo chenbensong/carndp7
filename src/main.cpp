@@ -8,6 +8,8 @@
 #include "helpers.h"
 #include "json.hpp"
 
+#include "spline.h"
+
 // for convenience
 using nlohmann::json;
 using std::string;
@@ -50,7 +52,14 @@ int main() {
     map_waypoints_dy.push_back(d_y);
   }
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
+  // Init lane and reference velocity.
+  int lane = 1;
+  double rv = 0;
+  // Define what is "close" (within 25 meters)
+  int CLOSE_RANGE = 25;
+  
+  h.onMessage([&lane, &rv,
+               &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
                &map_waypoints_dx,&map_waypoints_dy]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
@@ -97,7 +106,74 @@ int main() {
            * TODO: define a path made up of (x,y) points that the car will visit
            *   sequentially every .02 seconds
            */
+          // Find and change lanes as needed.
+          
+          // Nearby car detectors.
+          bool front_car = false;
+				  bool left_car = false;
+				  bool right_car = false;
 
+          // Check history.
+          int prev_size = previous_path_x.size();
+          if(prev_size > 0) {
+            car_s = end_path_s;
+          }
+          
+          // Check sensor fusion data.
+          for(int i = 0; i < sensor_fusion.size(); ++i) {
+            float d = sensor_fusion[i][6];
+			  		int curr_lane = -1;
+						if ( d > 0 && d < 4 ) {
+              curr_lane = 0;
+						} else if ( d >= 4 && d < 8 ) {
+							curr_lane = 1;
+						} else if ( d >= 8 && d < 12 ) {
+							curr_lane = 2;
+						}
+						if (curr_lane < 0) {
+							continue;
+						}
+
+						double vx = sensor_fusion[i][3];
+						double vy = sensor_fusion[i][4];
+						double check_speed = sqrt(vx * vx + vy * vy);
+						double check_car_s = sensor_fusion[i][5];
+
+            // Project using previous points.
+						check_car_s += ((double)prev_size * check_speed / 50.0);
+						
+            // Detect front cars in all lanes.
+						if((check_car_s > car_s) && ((check_car_s - car_s) < CLOSE_RANGE)) {
+							if (curr_lane == lane) {
+								front_car = true;
+							} else if (curr_lane < lane) {
+								left_car = true;
+							} else if (curr_lane > lane) {
+								right_car = true;
+							}
+						}
+
+            // Detect rear cars in neighboring lanes.
+						if((curr_lane != lane) &&(check_car_s < car_s) && ((check_car_s - car_s) > -CLOSE_RANGE)) {
+							if (curr_lane < lane) {
+								left_car = true;
+							} else if (curr_lane > lane) {
+						  	right_car = true;
+							}
+						}
+          }
+
+          // Adjust speed and lane.
+          if(front_car) {  // Slow down 
+            ref_vel -= 0.2;  // Decrease 10 miles per hour.
+			  		if ( !left_car && lane > 0 ) {
+							--lane; // Switch left
+						} else if ( !right_car && lane != 2 ) {
+							++lane; // Switch right.
+						}
+					} else if(ref_vel < 49.8) {  // Upper bound is 50 mph - accelerate.
+            rv += 0.2;
+          }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
