@@ -1,7 +1,5 @@
 #include <uWS/uWS.h>
-
 #include <fstream>
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -57,8 +55,8 @@ int main() {
   // Init lane and reference velocity.
   int lane = 1;
   double rv = 0;
-  // Define what is "close" (within 25 meters)
-  int CLOSE_RANGE = 25;
+  // Define what is "close" (within 30 meters)
+  int CLOSE_RANGE = 30;
 
   h.onMessage([ & lane, & rv, &
       map_waypoints_x, & map_waypoints_y, & map_waypoints_s, &
@@ -177,7 +175,96 @@ int main() {
             } else if (ref_vel < 49.8) { // Upper bound is 50 mph - accelerate.
               rv += 0.2;
             }
+            
+            // Now define the path based on the updates above.
+            double ref_x = car_x;
+            double ref_y = car_y;
+            double ref_yaw = deg2rad(car_yaw);
 
+            if(prev_size < 2) {
+							// Add 2 points along tangent line.
+							ptsx.push_back(car_x - cos(car_yaw));
+							ptsx.push_back(car_x);
+
+							ptsy.push_back(car_y - sin(car_yaw));
+							ptsy.push_back(car_y);
+						} else {  // Reference last point from history.
+							ref_x = previous_path_x[prev_size - 1];
+							ref_y = previous_path_y[prev_size - 1];
+
+							double ref_x_prev = previous_path_x[prev_size - 2];
+							double ref_y_prev = previous_path_y[prev_size - 2];
+              // Update ref_yaw for calculations below.
+							ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
+
+							// Tangent line starts at prev end point.
+							ptsx.push_back(ref_x_prev);
+							ptsx.push_back(ref_x);
+
+							ptsy.push_back(ref_y_prev);
+							ptsy.push_back(ref_y);
+						}
+
+						// Generate 3 points at 30 meters apart in Frenet, and convert into xy.
+					  vector<double> next_wp1 = getXY(car_s + 30,(2 + 4 * lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
+					  vector<double> next_wp2 = getXY(car_s + 30 * 2,(2 + 4 * lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
+					  vector<double> next_wp3 = getXY(car_s + 30 * 3,(2 + 4 * lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
+
+					  ptsx.push_back(next_wp1[0]);
+            ptsx.push_back(next_wp2[0]);
+            ptsx.push_back(next_wp3[0]);
+            ptsy.push_back(next_wp1[1]);
+            ptsy.push_back(next_wp2[1]);
+            ptsy.push_back(next_wp3[1]);
+
+            // Converts xy to car coordinates.
+						for (int i = 0; i < ptsx.size(); i++)
+						{
+							double local_x = ptsx[i] - ref_x;
+							double local_y = ptsy[i] - ref_y;
+
+							ptsx[i] = (local_x * cos(0 - ref_yaw) - local_y * sin(0 - ref_yaw));
+							ptsy[i] = (local_x * sin(0 - ref_yaw) + local_y * cos(0 - ref_yaw));
+						}
+
+						// Calculate spline.
+						tk::spline s;
+            s.set_points(ptsx, ptsy);
+
+            for(int i = 0; i < previous_path_x.size(); ++i) {
+              next_x_vals.push_back(previous_path_x[i]);
+              next_y_vals.push_back(previous_path_y[i]);
+            }
+
+            // Breaking up spline.
+            double target_x = 30.0;
+            double target_y = s(target_x);
+            double target_dist = sqrt(target_x * target_x + target_y * target_y);
+            double x_delta = 0;
+
+            // Add the remaining points until total of 50 points.
+            for (int i = 1; i <= 50 - previous_path_x.size(); ++i) {
+              double x_pos = x_delta + (target_x) / (target_dist / ((rv / 50) / 2));
+              double y_pos = s(x_point);
+
+              x_delta = x_pos;
+
+              double x_ref = x_pos;
+              double y_ref = y_pos;
+
+              // Now convert back to global coords.
+              x_pos = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
+              y_pos = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
+
+              x_pos += ref_x;
+              y_pos += ref_y;
+
+              next_x_vals.push_back(x_pos);
+              next_y_vals.push_back(y_pos);
+            }
+
+            // End TODO.
+            
             msgJson["next_x"] = next_x_vals;
             msgJson["next_y"] = next_y_vals;
 
